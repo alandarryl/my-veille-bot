@@ -10,8 +10,9 @@ from veille.models import Article, ScoredArticle
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+# Modèles stables mis à jour d'après les retours d'API
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
 
 
 class LLMScore(BaseModel):
