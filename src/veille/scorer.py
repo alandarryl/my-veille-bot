@@ -30,7 +30,7 @@ class BatchScoreResult(BaseModel):
 
 def _transient(exc: BaseException) -> bool:
     code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
-    return code in (429, 500, 502, 503, 504)
+    return code in (500, 502, 503)
 
 
 _retry = retry(
