@@ -12,13 +12,13 @@ on:
 
 concurrency:
   group: veille-job
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   run-veille:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Requis pour committer data/seen.json
+      contents: write
 
     steps:
       - name: Checkout du code
@@ -40,13 +40,15 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           DEFAULT_LLM_PROVIDER: "gemini"
+          GEMINI_MODEL: "gemini-3.8-flash"
           DISCORD_WEBHOOKS: ${{ secrets.DISCORD_WEBHOOKS }}
           FORCE_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_run || 'false' }}
         run: uv run python -m veille.main
 
       - name: Sauvegarder l'état (data/seen.json)
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/seen.json
-          git diff --staged --quiet || (git commit -m "chore: update seen.json [skip ci]" && git push)
+          git diff --staged --quiet || (git commit -m "chore: update seen.json [skip ci]" && git pull --rebase && git push)
