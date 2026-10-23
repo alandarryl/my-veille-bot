@@ -17,6 +17,7 @@ concurrency:
 jobs:
   run-veille:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
 
@@ -41,6 +42,8 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           DEFAULT_LLM_PROVIDER: "gemini"
           GEMINI_MODEL: "gemini-3.8-flash"
+          GEMINI_THINKING_BUDGET: "0"
+          # GROQ_MODEL: à renseigner quand tu auras le nom valide
           DISCORD_WEBHOOKS: ${{ secrets.DISCORD_WEBHOOKS }}
           FORCE_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_run || 'false' }}
         run: uv run python -m veille.main

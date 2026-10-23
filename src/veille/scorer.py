@@ -11,8 +11,10 @@ from veille.models import Article, ScoredArticle
 
 logger = logging.getLogger(__name__)
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "")
+# "0" = pas de réflexion, "" = ne pas envoyer le paramètre
+GEMINI_THINKING_BUDGET = os.getenv("GEMINI_THINKING_BUDGET", "0")
 
 
 class LLMScore(BaseModel):
@@ -27,16 +29,15 @@ class BatchScoreResult(BaseModel):
 
 
 def _transient(exc: BaseException) -> bool:
-    # On ne réessaie que sur les erreurs temporaires (pas sur un 404 ou 400)
     code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
     return code in (429, 500, 502, 503, 504)
 
 
 _retry = retry(
     retry=retry_if_exception(_transient),
-    stop=stop_after_attempt(3),
+    stop=stop_after_attempt(2),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True,  # on voit la vraie erreur, pas "RetryError"
+    reraise=True,
 )
 
 
@@ -82,18 +83,43 @@ def _join(articles: list[Article], scores: list[LLMScore]) -> list[ScoredArticle
     return out
 
 
+def _gemini_config(with_thinking: bool) -> types.GenerateContentConfig:
+    kwargs = dict(
+        response_mime_type="application/json",
+        response_schema=BatchScoreResult,
+        temperature=0.2,
+    )
+    if with_thinking and GEMINI_THINKING_BUDGET != "":
+        kwargs["thinking_config"] = types.ThinkingConfig(
+            thinking_budget=int(GEMINI_THINKING_BUDGET)
+        )
+    return types.GenerateContentConfig(**kwargs)
+
+
 @_retry
 async def score_gemini(articles: list[Article], criteria: str) -> list[ScoredArticle]:
-    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
-    response = await client.aio.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=_prompt(articles, criteria),
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_schema=BatchScoreResult,
-            temperature=0.2,
-        ),
+    client = genai.Client(
+        api_key=os.environ["GEMINI_API_KEY"],
+        http_options=types.HttpOptions(timeout=60_000),  # 60 s
     )
+    contents = _prompt(articles, criteria)
+
+    try:
+        response = await client.aio.models.generate_content(
+            model=GEMINI_MODEL, contents=contents, config=_gemini_config(True)
+        )
+    except Exception as e:
+        # Si le modèle refuse le paramètre de réflexion (400), on réessaie sans
+        if getattr(e, "code", None) == 400 and GEMINI_THINKING_BUDGET != "":
+            logger.warning("Paramètre thinking refusé, nouvel essai sans.")
+            response = await client.aio.models.generate_content(
+                model=GEMINI_MODEL, contents=contents, config=_gemini_config(False)
+            )
+        else:
+            raise
+
+    if not response.text:
+        raise ValueError("Réponse Gemini vide")
     result = BatchScoreResult.model_validate_json(response.text)
     return _join(articles, result.results)
 
@@ -102,7 +128,7 @@ async def score_gemini(articles: list[Article], criteria: str) -> list[ScoredArt
 async def score_groq(articles: list[Article], criteria: str) -> list[ScoredArticle]:
     from groq import AsyncGroq
 
-    client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
+    client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"], timeout=60.0)
     response = await client.chat.completions.create(
         model=GROQ_MODEL,
         messages=[{"role": "user", "content": _prompt(articles, criteria)}],
@@ -127,6 +153,9 @@ async def score_articles_batch(
 
     for name in order:
         if not os.getenv(keys[name]):
+            continue
+        if name == "groq" and not GROQ_MODEL:
+            logger.info("GROQ_MODEL non défini, fallback Groq ignoré.")
             continue
         try:
             return await providers[name](articles, criteria)

@@ -12,10 +12,10 @@ class Article(BaseModel):
 
 
 class ScoredArticle(BaseModel):
-    id: str
-    score: int = Field(..., description="Note globale de 0 à 10")
-    summary: str = Field(..., description="Résumé concis de 2-3 lignes max")
-    reason: str = Field(..., description="Pourquoi cet article a obtenu ce score")
+    article: Article
+    score: int
+    summary: str
+    reason: str
 
 
 class ChannelConfig(BaseModel):

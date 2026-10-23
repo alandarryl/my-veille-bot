@@ -19,7 +19,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("main")
 
-load_dotenv()  # Charge le .env local si présent
+load_dotenv()
 
 
 def is_scheduled_time() -> bool:
@@ -53,10 +53,9 @@ async def process_channel(channel_name: str, config: ChannelConfig, seen_ids: se
     selected = selected[: config.top_n]
 
     if selected:
-        try:
-            await send_to_discord(channel_name, [(s.article, s) for s in selected])
-        except Exception as e:
-            logger.error(f"[{channel_name}] Échec de l'envoi Discord : {e!r}")
+        ok = await send_to_discord(channel_name, [(s.article, s) for s in selected])
+        if not ok:
+            logger.error(f"[{channel_name}] Envoi Discord échoué, articles non marqués comme vus.")
             return None
     else:
         logger.info(f"[{channel_name}] Aucun article n'a atteint le score minimum de {config.min_score}.")
@@ -96,6 +95,8 @@ async def main():
         if processed:
             seen_ids.update(processed)
             save_seen_ids(seen_ids)  # sauvegarde après chaque salon
+
+        await asyncio.sleep(1)  # évite de saturer les quotas
 
     if failed:
         logger.error("Salons en échec : %s", ", ".join(failed))
