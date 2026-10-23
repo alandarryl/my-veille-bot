@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
@@ -10,9 +11,8 @@ from veille.models import Article, ScoredArticle
 
 logger = logging.getLogger(__name__)
 
-# Modèles stables mis à jour d'après les retours d'API
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.1-70b-versatile")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 
 
 class LLMScore(BaseModel):
@@ -27,7 +27,7 @@ class BatchScoreResult(BaseModel):
 
 
 def _transient(exc: BaseException) -> bool:
-    """On ne réessaie que sur les erreurs temporaires (pas sur un 404 ou 400)."""
+    # On ne réessaie que sur les erreurs temporaires (pas sur un 404 ou 400)
     code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
     return code in (429, 500, 502, 503, 504)
 
@@ -36,7 +36,7 @@ _retry = retry(
     retry=retry_if_exception(_transient),
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=2, max=10),
-    reraise=True,
+    reraise=True,  # on voit la vraie erreur, pas "RetryError"
 )
 
 
@@ -52,15 +52,15 @@ def _prompt(articles: list[Article], criteria: str) -> str:
 Critères du salon : "{criteria}"
 
 Pour chaque article :
-1. score : entier de 0 à 10 selon la pertinence vis-à-vis des critères ;
+1. score entier de 0 à 10 selon la pertinence vis-à-vis des critères ;
 2. summary : 2 phrases maximum, en français ;
 3. reason : une phrase courte justifiant la note.
-
 Réponds en JSON : {{"results": [{{"id": "...", "score": 0, "summary": "...", "reason": "..."}}]}}
 Reprends exactement l'id fourni.
 
 Articles :
-{_payload(articles)}"""
+{_payload(articles)}
+"""
 
 
 def _join(articles: list[Article], scores: list[LLMScore]) -> list[ScoredArticle]:
@@ -122,7 +122,6 @@ async def score_articles_batch(
 
     providers = {"gemini": score_gemini, "groq": score_groq}
     keys = {"gemini": "GEMINI_API_KEY", "groq": "GROQ_API_KEY"}
-    
     first = os.getenv("DEFAULT_LLM_PROVIDER", "gemini").lower()
     order = [first] + [p for p in providers if p != first]
 
@@ -133,5 +132,4 @@ async def score_articles_batch(
             return await providers[name](articles, criteria)
         except Exception as e:
             logger.warning("Échec du LLM %s : %r", name, e)
-
     return None

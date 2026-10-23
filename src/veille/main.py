@@ -25,12 +25,14 @@ load_dotenv()  # Charge le .env local si présent
 
 def is_scheduled_time() -> bool:
     """Vérifie si l'heure actuelle à Paris est 9h ou 18h (utilisé pour GitHub Actions)."""
+    # Si le script est lancé manuellement (workflow_dispatch ou local), on contourne le filtre
     if os.getenv("FORCE_RUN", "false").lower() == "true":
         return True
 
     now_paris = datetime.now(ZoneInfo("Europe/Paris"))
     logger.info(f"Heure actuelle à Paris : {now_paris.strftime('%H:%M %d/%m/%Y')}")
 
+    # Tolérance pour la plage horaire de 9h et 18h
     return now_paris.hour in [9, 18]
 
 
@@ -48,13 +50,6 @@ async def process_channel(channel_name: str, config: ChannelConfig, seen_ids: se
 
     # 2. Notation par le LLM
     scored_results = await score_articles_batch(articles, config.criteria)
-    
-    # SÉCURITÉ : Si le LLM a totalement échoué, on retourne un set vide.
-    # Les articles ne seront PAS marqués comme vus et pourront être retentés plus tard.
-    if scored_results is None:
-        logger.error(f"[{channel_name}] Échec du scoring LLM. Les articles ne sont pas marqués comme vus.")
-        return set()
-
     scored_map = {res.id: res for res in scored_results}
 
     # 3. Filtrage selon les règles (min_score et top_n)
@@ -62,7 +57,7 @@ async def process_channel(channel_name: str, config: ChannelConfig, seen_ids: se
     new_seen_ids = set()
 
     for article in articles:
-        new_seen_ids.add(article.id)  # Marqués comme vus uniquement si le scoring a fonctionné
+        new_seen_ids.add(article.id)  # On marque comme vu pour ne pas le ré-analyser
         scored = scored_map.get(article.id)
         if scored and scored.score >= config.min_score:
             selected_items.append((article, scored))
@@ -113,4 +108,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.main() if hasattr(asyncio, "main") else asyncio.run(main())
+    asyncio.run(main())
