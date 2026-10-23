@@ -48,9 +48,9 @@ Articles à évaluer :
 {json.dumps(articles_payload, ensure_ascii=False, indent=2)}
 """
 
-    # Utilisation du mode JSON structuré via le SDK officiel google-genai
+    # Utilisation du modèle valide gemini-1.5-flash
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model="gemini-1.5-flash",
         contents=prompt,
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
@@ -65,7 +65,7 @@ Articles à évaluer :
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 async def score_articles_groq(articles: List[Article], criteria: str) -> List[ScoredArticle]:
-    """Fallback en utilisant l'API Groq (ex: Llama-3)."""
+    """Fallback en utilisant l'API Groq."""
     from groq import AsyncGroq
 
     api_key = os.getenv("GROQ_API_KEY")
@@ -118,7 +118,6 @@ async def score_articles_batch(articles: List[Article], criteria: str) -> List[S
             return []
     except Exception as e:
         logger.warning(f"Échec avec le LLM principal ({provider}): {e}. Tentative de fallback...")
-        # Bascule automatique vers le second fournisseur si l'autre clé est dispo
         try:
             if provider == "gemini" and os.getenv("GROQ_API_KEY"):
                 return await score_articles_groq(articles, criteria)
