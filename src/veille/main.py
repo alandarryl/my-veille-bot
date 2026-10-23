@@ -13,7 +13,6 @@ from veille.fetch import fetch_all_channel_feeds
 from veille.scorer import score_articles_batch
 from veille.discord import send_to_discord
 
-# Configuration des logs
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -24,23 +23,19 @@ load_dotenv()  # Charge le .env local si présent
 
 
 def is_scheduled_time() -> bool:
-    """Vérifie si l'heure actuelle à Paris est 9h ou 18h (utilisé pour GitHub Actions)."""
-    # Si le script est lancé manuellement (workflow_dispatch ou local), on contourne le filtre
+    """Vérifie si l'heure actuelle à Paris est 9h ou 18h."""
     if os.getenv("FORCE_RUN", "false").lower() == "true":
         return True
 
     now_paris = datetime.now(ZoneInfo("Europe/Paris"))
     logger.info(f"Heure actuelle à Paris : {now_paris.strftime('%H:%M %d/%m/%Y')}")
-
-    # Tolérance pour la plage horaire de 9h et 18h
     return now_paris.hour in [9, 18]
 
 
-async def process_channel(channel_name: str, config: ChannelConfig, seen_ids: set) -> set:
-    """Traite un canal : Fetch -> Scoring -> Discord -> Mise à jour des IDs vus."""
+async def process_channel(channel_name: str, config: ChannelConfig, seen_ids: set) -> set | None:
+    """Retourne les IDs à marquer comme vus, ou None si le salon a échoué."""
     logger.info(f"--- Traitement du canal : {channel_name} ---")
 
-    # 1. Récupération des articles
     articles = await fetch_all_channel_feeds(config.feeds, seen_ids)
     if not articles:
         logger.info(f"[{channel_name}] Aucun nouvel article à analyser.")
@@ -48,31 +43,25 @@ async def process_channel(channel_name: str, config: ChannelConfig, seen_ids: se
 
     logger.info(f"[{channel_name}] {len(articles)} nouveau(x) article(s) trouvé(s).")
 
-    # 2. Notation par le LLM
     scored_results = await score_articles_batch(articles, config.criteria)
-    scored_map = {res.id: res for res in scored_results}
+    if scored_results is None:
+        logger.error(f"[{channel_name}] Échec du scoring LLM, articles non marqués comme vus.")
+        return None
 
-    # 3. Filtrage selon les règles (min_score et top_n)
-    selected_items = []
-    new_seen_ids = set()
+    selected = [s for s in scored_results if s.score >= config.min_score]
+    selected.sort(key=lambda s: s.score, reverse=True)
+    selected = selected[: config.top_n]
 
-    for article in articles:
-        new_seen_ids.add(article.id)  # On marque comme vu pour ne pas le ré-analyser
-        scored = scored_map.get(article.id)
-        if scored and scored.score >= config.min_score:
-            selected_items.append((article, scored))
-
-    # Tri par score décroissant et conservation du top_n
-    selected_items.sort(key=lambda x: x[1].score, reverse=True)
-    selected_items = selected_items[:config.top_n]
-
-    # 4. Envoi sur Discord
-    if selected_items:
-        await send_to_discord(channel_name, selected_items)
+    if selected:
+        try:
+            await send_to_discord(channel_name, [(s.article, s) for s in selected])
+        except Exception as e:
+            logger.error(f"[{channel_name}] Échec de l'envoi Discord : {e!r}")
+            return None
     else:
         logger.info(f"[{channel_name}] Aucun article n'a atteint le score minimum de {config.min_score}.")
 
-    return new_seen_ids
+    return {a.id for a in articles}
 
 
 async def main():
@@ -80,7 +69,6 @@ async def main():
         logger.info("Ce n'est ni 9h ni 18h à Paris (et pas de FORCE_RUN). Arrêt du script.")
         sys.exit(0)
 
-    # Chargement de la configuration des canaux
     try:
         with open("config/channels.yaml", "r", encoding="utf-8") as f:
             channels_raw = yaml.safe_load(f)
@@ -89,20 +77,29 @@ async def main():
         sys.exit(1)
 
     seen_ids = load_seen_ids()
-    all_new_seen_ids = set()
+    failed: list[str] = []
 
     for channel_name, raw_config in channels_raw.items():
         if not raw_config.get("feeds"):
             continue
+        try:
+            config = ChannelConfig(**raw_config)
+            processed = await process_channel(channel_name, config, seen_ids)
+        except Exception as e:
+            logger.error(f"[{channel_name}] Erreur inattendue : {e!r}")
+            processed = None
 
-        config = ChannelConfig(**raw_config)
-        processed_ids = await process_channel(channel_name, config, seen_ids.union(all_new_seen_ids))
-        all_new_seen_ids.update(processed_ids)
+        if processed is None:
+            failed.append(channel_name)
+            continue
 
-    # Sauvegarde des nouveaux IDs
-    if all_new_seen_ids:
-        seen_ids.update(all_new_seen_ids)
-        save_seen_ids(seen_ids)
+        if processed:
+            seen_ids.update(processed)
+            save_seen_ids(seen_ids)  # sauvegarde après chaque salon
+
+    if failed:
+        logger.error("Salons en échec : %s", ", ".join(failed))
+        sys.exit(1)
 
     logger.info("Veille terminée avec succès !")
 
