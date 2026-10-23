@@ -1,27 +1,29 @@
 ai-news:
-  description: "Toutes les nouveautés majeures sur l'IA"
+  description: "Nouveautés majeures sur l'IA et modèles"
   top_n: 5
   min_score: 7
   criteria: "Annonces majeures, nouveaux modèles, percées en recherche. Ignore le marketing agressif et les listes génériques."
   feeds:
     - https://www.technologyreview.com/topic/artificial-intelligence/feed
     - https://huggingface.co/blog/feed.xml
-    - https://hnrss.org/newest?q=AI+OR+LLM&points=100
     - https://techcrunch.com/category/artificial-intelligence/feed/
+    - https://openai.com/news/rss.xml
+    - https://deepmind.google/blog/rss.xml
 
 tech-news:
-  description: "Nouvelles technologies mondiales"
+  description: "Actualités tech mondiales"
   top_n: 5
-  min_score: 7
+  min_score: 6
   criteria: "Actualités technologiques à fort impact, innovations matérielles/logicielles d'envergure. Pas de simples rumeurs."
   feeds:
     - https://feeds.arstechnica.com/arstechnica/index
     - https://www.theverge.com/rss/index.xml
-    - https://hnrss.org/frontpage
     - https://korben.info/feed
+    - https://www.numerama.com/feed/
+    - https://news.ycombinator.com/rss
 
 programming-news:
-  description: "Actualités de la programmation et du développement"
+  description: "Dev, langages et architecture"
   top_n: 4
   min_score: 7
   criteria: "Évolution des langages, nouvelles versions majeures, bonnes pratiques de code, articles d'architecture logicielle."
@@ -30,57 +32,64 @@ programming-news:
     - https://dev.to/feed
     - https://github.blog/feed/
     - https://realpython.com/atom.xml
+    - https://stackoverflow.blog/feed/
 
 ai-tools:
-  description: "Nouveaux outils basés sur l'IA"
+  description: "Nouveaux outils et applications IA"
   top_n: 3
-  min_score: 8
+  min_score: 7
   criteria: "Applications et outils IA véritablement utiles pour les développeurs ou la productivité. Pas de wrappers basiques."
   feeds:
-    - https://hnrss.org/newest?q=Show+HN+AI&points=30
     - https://www.producthunt.com/feed
+    - https://lobste.rs/t/ai.rss
+    - https://hnrss.org/newest?q=Show+HN+AI&points=30
 
 programming-bug:
-  description: "Bugs critiques, vulnérabilités de code et incidents logiciels"
+  description: "Post-mortems, pannes et bugs majeurs"
   top_n: 3
   min_score: 7
-  criteria: "Analyse de bugs célèbres, failles d'implémentation de code, pannes logicielles d'envergure ou retours d'expérience sur un post-mortem."
+  criteria: "Analyse de bugs célèbres, pannes logicielles d'envergure, retours d'expérience sur un post-mortem."
   feeds:
-    - https://hnrss.org/newest?q=bug+OR+outage+OR+postmortem&points=50
+    - https://www.theregister.com/headlines.atom
+    - https://stackoverflow.blog/feed/
+    - https://hnrss.org/newest?q=postmortem+OR+outage&points=50
 
 tech-weakness:
-  description: "Failles et vulnérabilités de sécurité"
-  top_n: 4
-  min_score: 8
-  criteria: "Failles Zero-Day, failles majeures dans des OS/logiciels/frameworks, avis de sécurité officiels."
-  feeds:
-    - https://thehackernews.com/feeds/posts/default
-    - https://www.bleepingcomputer.com/feed/
-    - https://krebsonsecurity.com/feed/
-
-security-failure:
-  description: "Piratages, fuites de données et incidents de sécurité"
+  description: "Vulnérabilités Zero-Day et failles"
   top_n: 4
   min_score: 7
-  criteria: "Fuites de données d'entreprises, attaques Ransomware majeures, piratages d'infrastructure."
+  criteria: "Failles Zero-Day, failles majeures dans des OS/logiciels/frameworks, avis de sécurité officiels."
   feeds:
-    - https://www.cert.ssi.gouv.fr/feed/
-    - https://googleprojectzero.blogspot.com/feeds/posts/default
+    - https://feeds.feedburner.com/TheHackersNews
+    - https://projectzero.google/feed.xml
+    - https://cert.cyber.gouv.fr/feed/
+    - https://www.cisa.gov/cybersecurity-advisories/all.xml
+
+security-failure:
+  description: "Cyberattaques et fuites de données"
+  top_n: 4
+  min_score: 7
+  criteria: "Fuites de données d'entreprises, attaques ransomware majeures, piratages d'infrastructure."
+  feeds:
+    - https://www.bleepingcomputer.com/feed/
+    - https://krebsonsecurity.com/feed/
+    - https://www.theregister.com/security/headlines.atom
 
 relevant-world-news:
-  description: "Actualité internationale majeure (géopolitique, économie)"
+  description: "Géopolitique et économie internationale"
   top_n: 5
   min_score: 8
   criteria: "Événements géopolitiques majeurs, décisions économiques mondiales, crises internationales. Pas de fait divers léger."
   feeds:
     - https://feeds.bbci.co.uk/news/world/rss.xml
-    - https://www.france24.com/fr/actualites/rss
+    - https://www.france24.com/fr/rss
     - https://www.lemonde.fr/international/rss_full.xml
+    - https://www.aljazeera.com/xml/rss/all.xml
 
 movie-news:
-  description: "Actualités du cinéma et séries"
+  description: "Sorties cinéma, trailers et séries"
   top_n: 3
-  min_score: 7
+  min_score: 6
   criteria: "Annonces de films majeurs, trailers attendus, sorties au cinéma/streaming et récompenses importantes."
   feeds:
     - https://variety.com/feed/
@@ -88,24 +97,26 @@ movie-news:
     - https://www.slashfilm.com/feed/
 
 anime-news:
-  description: "Actualités sur les animes et mangas"
+  description: "Animes, mangas et adaptations"
   top_n: 3
   min_score: 7
   criteria: "Annonces de nouvelles saisons, adaptations d'animes, trailers majeurs, dates de sortie."
   feeds:
     - https://www.animenewsnetwork.com/all/rss.xml?ann-edition=fr
     - https://www.crunchyroll.com/news/rss
+    - https://myanimelist.net/rss/news.xml
 
 kdrama-news:
-  description: "Actualités des K-Dramas et séries coréennes"
+  description: "Séries coréennes et sorties"
   top_n: 3
   min_score: 7
   criteria: "Annonces de casting, nouveaux K-Dramas en production, dates de sortie sur les plateformes (Netflix, Viki, etc.)."
   feeds:
     - https://www.soompi.com/feed
+    - https://asianjunkie.com/feed/
 
 video-game-news:
-  description: "Actualité générale du jeu vidéo"
+  description: "Actu générale du jeu vidéo"
   top_n: 4
   min_score: 7
   criteria: "Annonces de consoles/jeux, rachats de studios, événements majeurs du jeu vidéo. Éviter les guides/soluces."
@@ -113,104 +124,124 @@ video-game-news:
     - https://www.ign.com/rss/articles/feed
     - https://www.eurogamer.net/feed/news
     - https://www.gamekult.com/feed.xml
+    - https://www.pcgamer.com/rss/
 
 video-game-coming-out:
-  description: "Sorties imminentes de jeux vidéo"
+  description: "Dates de sortie de jeux vidéo"
   top_n: 3
   min_score: 7
   criteria: "Annonces de dates de sortie officielles, sorties de la semaine sur PC et consoles."
   feeds:
     - https://www.gematsu.com/feed
+    - https://www.gamespot.com/feeds/news/
 
 animation-tools:
-  description: "Outils et logiciels d'animation (2D/3D/FX)"
+  description: "Logiciels 2D/3D (Blender, Maya, etc.)"
   top_n: 3
   min_score: 7
   criteria: "Nouveautés sur Blender, Toon Boom, Maya, Houdini, moteurs de rendu et plugins d'animation."
   feeds:
-    - https://www.cgchannel.com/feed/
-    - https://cartoonbrew.com/feed
+    - http://feeds2.feedburner.com/cgchannel/nHpU
+    - https://www.cartoonbrew.com/feed
+    - https://www.blender.org/feed/
+    - https://code.blender.org/feed/
 
 video-game-dev-tools:
-  description: "Outils de développement de jeux vidéo (Moteurs, assets, dev)"
+  description: "Moteurs de jeu (Unreal, Unity, Godot)"
   top_n: 3
   min_score: 7
   criteria: "Mises à jour de Unreal Engine, Unity, Godot, outils de création de jeux, ressources pour devs indés."
   feeds:
     - https://godotengine.org/rss.xml
-    - https://game-developer.com/rss.xml
+    - https://www.gamedeveloper.com/rss.xml
+    - https://80.lv/feed/
 
 rpg-news:
-  description: "Actualités RPG (Jeux vidéo RPG et Jeux de Rôle sur table)"
+  description: "Actu RPG (Jeux vidéo et JDR papier)"
   top_n: 3
-  min_score: 7
+  min_score: 6
   criteria: "Mises à jour ou annonces de JRPG/CRPG, ou sorties majeures de JDR papier/D&D/Pathfinder."
   feeds:
-    - https://www.rpgwatch.com/rss.xml
     - https://www.rockpapershotgun.com/feed
+    - https://www.pcgamer.com/rss/
+    - https://www.gematsu.com/feed
 
 software-job-news:
-  description: "Tendances du marché de l'emploi software"
+  description: "Marché de l'emploi dev et tendances"
   top_n: 3
   min_score: 7
   criteria: "Analyses de salaires tech, rapports sur le marché de l'emploi dev, vagues de recrutements/licenciements."
   feeds:
-    - https://hnrss.org/newest?q=Who+is+Hiring&points=10
+    - https://stackoverflow.blog/feed/
+    - https://newsletter.pragmaticengineer.com/feed
+    - https://hnrss.org/newest?q=layoffs+OR+hiring&points=50
 
 job-that-suit-me:
-  description: "Offres d'emploi tech ciblées"
+  description: "Offres ciblées selon vos critères"
   top_n: 3
   min_score: 8
   criteria: "Offres d'emploi développeur/tech en Remote ou France avec un bon cadre technique."
   feeds:
     - https://weworkremotely.com/categories/remote-full-stack-programming-jobs.rss
-    - https://remoteok.com/remote-dev-jobs.rss
+    - https://weworkremotely.com/categories/remote-programming-jobs.rss
+    - https://remotive.com/remote-jobs/feed/software-dev
+    - https://www.python.org/jobs/feed/rss/
 
 france-news:
-  description: "Actualités majeures en France"
+  description: "Actu nationale en France"
   top_n: 4
   min_score: 8
   criteria: "Événements importants en France (politique publique, économie, technologie en France). Pas de fait divers local."
   feeds:
-    - https://www.francetvinfo.fr/titres.rss
+    - https://www.franceinfo.fr/titres.rss
     - https://www.lemonde.fr/rss/une.xml
+    - https://www.lemonde.fr/economie/rss_full.xml
 
 hello-world:
-  description: "Actualités insólites, positives et découvertes"
+  description: "Insolite, science et bonnes nouvelles"
   top_n: 3
   min_score: 7
   criteria: "Histoires positives, découvertes scientifiques amusantes ou insolites, belles initiatives à travers le monde."
   feeds:
     - https://www.goodnewsnetwork.org/feed/
-    - https://hnrss.org/newest?q=Atlas+Obscura
+    - https://www.atlasobscura.com/feeds/latest
+    - https://www.sciencedaily.com/rss/top.xml
 
 big-hit-one:
-  description: "Les sujets les plus viraux et populaires du web"
+  description: "Sujets les plus viraux du web"
   top_n: 3
   min_score: 9
-  criteria: "L'article ou le sujet le plus populaire/discuté du moment sur le web (Hacker News top score, etc.)."
+  criteria: "Le sujet le plus populaire et discuté du moment sur le web, qui touche beaucoup de monde."
   feeds:
     - https://hnrss.org/best?points=300
+    - https://feeds.bbci.co.uk/news/rss.xml
 
 linkedin-post:
-  description: "Idées de posts LinkedIn basées sur les meilleures news tech"
+  description: "Idées de posts LinkedIn rédigés"
   top_n: 1
-  min_score: 9
-  criteria: "Sélection de la meilleure actu tech du jour adaptée pour être rédigée sous forme d'un post LinkedIn captivant."
-  feeds: [] # Utilise les articles retenus des autres salons
+  min_score: 8
+  criteria: "Sujet tech ou carrière avec un angle fort, adapté à un post LinkedIn captivant."
+  feeds:
+    - https://www.technologyreview.com/feed/
+    - https://www.wired.com/feed/rss
+    - https://hbr.org/feed
 
 tool-useful:
-  description: "Outils pratiques et logiciels utiles au quotidien"
+  description: "Utilitaires et pépites logicielles"
   top_n: 3
   min_score: 8
   criteria: "Outils open source, utilitaires CLI/Desktop, petites pépites logicielles."
   feeds:
-    - https://hnrss.org/newest?q=Show+HN&points=50
+    - https://lobste.rs/t/show.rss
+    - https://www.producthunt.com/feed
+    - https://hnrss.org/show?points=50
 
 interesting-project:
-  description: "Projets open source et initiatives intéressantes"
+  description: "Projets GitHub et open source"
   top_n: 3
   min_score: 8
   criteria: "Projets GitHub innovants, nouvelles librairies ou expérimentations techniques marquantes."
   feeds:
-    - https://hnrss.org/newest?q=GitHub+OR+project&points=100
+    - https://lobste.rs/t/show.rss
+    - https://github.blog/feed/
+    - https://hnrss.org/show?points=100
