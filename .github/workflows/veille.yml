@@ -1,0 +1,53 @@
+name: Veille Automatique
+
+on:
+  schedule:
+    # Déclenchements aux heures UTC qui correspondent à 9h et 18h à Paris (été/hiver)
+    - cron: "0 7,8,16,17 * * *"
+  workflow_dispatch:
+    inputs:
+      force_run:
+        description: "Forcer l'exécution hors plages 9h/18h"
+        required: false
+        default: "true"
+
+concurrency:
+  group: veille-job
+  cancel-in-progress: true
+
+jobs:
+  run-veille:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Requis pour committer data/seen.json
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      - name: Installation de uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Configuration de Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Installation des dépendances
+        run: uv sync
+
+      - name: Exécution du script de veille
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          DEFAULT_LLM_PROVIDER: "gemini"
+          DISCORD_WEBHOOKS: ${{ secrets.DISCORD_WEBHOOKS }}
+          FORCE_RUN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.force_run || 'false' }}
+        run: uv run python -m veille.main
+
+      - name: Sauvegarder l'état (data/seen.json)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/seen.json
+          git diff --staged --quiet || (git commit -m "chore: update seen.json [skip ci]" && git push)
