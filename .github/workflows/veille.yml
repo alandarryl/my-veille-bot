@@ -2,7 +2,6 @@ name: Veille Automatique
 
 on:
   schedule:
-    # Déclenchements aux heures UTC qui correspondent à 9h et 18h à Paris (été/hiver)
     - cron: "0 7,8,16,17 * * *"
   workflow_dispatch:
     inputs:
