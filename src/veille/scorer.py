@@ -20,7 +20,7 @@ def get_llm_provider() -> str:
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
 async def score_articles_gemini(articles: List[Article], criteria: str) -> List[ScoredArticle]:
-    """Score un lot d'articles en utilisant la bibliothèque google-genai."""
+    """Score un lot d'articles en utilisant la bibliothèque google-genai (v1 API)."""
     from google import genai
     from google.genai import types
 
@@ -29,7 +29,8 @@ async def score_articles_gemini(articles: List[Article], criteria: str) -> List[
         logger.error("GEMINI_API_KEY absente.")
         return []
 
-    client = genai.Client(api_key=api_key)
+    # Forcer la version v1 de l'API pour éviter l'erreur 404 sur v1beta
+    client = genai.Client(api_key=api_key, http_options={"api_version": "v1"})
 
     articles_payload = [
         {"id": a.id, "title": a.title, "summary": a.summary, "link": a.link}
@@ -42,13 +43,12 @@ async def score_articles_gemini(articles: List[Article], criteria: str) -> List[
 Instructions :
 1. Donne une note de 0 à 10 pour chaque article selon sa pertinence vis-à-vis des critères.
 2. Rédige un résumé très concis (2-3 phrases) en français.
-3. Explique en une phrase courte la raison de la note.
+3. Explique en une sentence courte la raison de la note.
 
 Articles à évaluer :
 {json.dumps(articles_payload, ensure_ascii=False, indent=2)}
 """
 
-    # Utilisation du modèle valide gemini-1.5-flash
     response = client.models.generate_content(
         model="gemini-1.5-flash",
         contents=prompt,
