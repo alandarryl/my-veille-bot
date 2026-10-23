@@ -20,6 +20,10 @@ dependencies = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# --- AJOUTER CETTE SECTION ---
+[tool.hatch.build.targets.wheel]
+packages = ["src/veille"]
+
 [tool.ruff]
 line-length = 88
 target-version = "py310"
