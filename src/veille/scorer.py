@@ -1,129 +1,136 @@
 import json
-import os
 import logging
-from typing import List
-from pydantic import BaseModel, Field
-from tenacity import retry, stop_after_attempt, wait_exponential
+import os
+from google import genai
+from google.genai import types
+from pydantic import BaseModel
+from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
 from veille.models import Article, ScoredArticle
 
 logger = logging.getLogger(__name__)
 
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+
+class LLMScore(BaseModel):
+    id: str
+    score: int
+    summary: str
+    reason: str
+
 
 class BatchScoreResult(BaseModel):
-    results: List[ScoredArticle] = Field(..., description="Liste des articles notés")
+    results: list[LLMScore]
 
 
-def get_llm_provider() -> str:
-    return os.getenv("DEFAULT_LLM_PROVIDER", "gemini").lower()
+def _transient(exc: BaseException) -> bool:
+    """On ne réessaie que sur les erreurs temporaires (pas sur un 404 ou 400)."""
+    code = getattr(exc, "code", None) or getattr(exc, "status_code", None)
+    return code in (429, 500, 502, 503, 504)
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def score_articles_gemini(articles: List[Article], criteria: str) -> List[ScoredArticle]:
-    """Score un lot d'articles en utilisant la bibliothèque google-genai (v1 API)."""
-    from google import genai
-    from google.genai import types
+_retry = retry(
+    retry=retry_if_exception(_transient),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        logger.error("GEMINI_API_KEY absente.")
-        return []
 
-    # Forcer la version v1 de l'API pour éviter l'erreur 404 sur v1beta
-    client = genai.Client(api_key=api_key, http_options={"api_version": "v1"})
+def _payload(articles: list[Article]) -> str:
+    return json.dumps(
+        [{"id": a.id, "title": a.title, "summary": a.summary[:500]} for a in articles],
+        ensure_ascii=False,
+    )
 
-    articles_payload = [
-        {"id": a.id, "title": a.title, "summary": a.summary, "link": a.link}
-        for a in articles
-    ]
 
-    prompt = f"""Tu es un expert en veille d'actualité.
-Évalue la liste d'articles ci-dessous selon les critères suivants : "{criteria}".
+def _prompt(articles: list[Article], criteria: str) -> str:
+    return f"""Tu es un expert en veille d'actualité.
+Critères du salon : "{criteria}"
 
-Instructions :
-1. Donne une note de 0 à 10 pour chaque article selon sa pertinence vis-à-vis des critères.
-2. Rédige un résumé très concis (2-3 phrases) en français.
-3. Explique en une sentence courte la raison de la note.
+Pour chaque article :
+1. score : entier de 0 à 10 selon la pertinence vis-à-vis des critères ;
+2. summary : 2 phrases maximum, en français ;
+3. reason : une phrase courte justifiant la note.
 
-Articles à évaluer :
-{json.dumps(articles_payload, ensure_ascii=False, indent=2)}
-"""
+Réponds en JSON : {{"results": [{{"id": "...", "score": 0, "summary": "...", "reason": "..."}}]}}
+Reprends exactement l'id fourni.
 
-    response = client.models.generate_content(
-        model="gemini-1.5-flash",
-        contents=prompt,
+Articles :
+{_payload(articles)}"""
+
+
+def _join(articles: list[Article], scores: list[LLMScore]) -> list[ScoredArticle]:
+    by_id = {a.id: a for a in articles}
+    out = []
+    for s in scores:
+        article = by_id.get(s.id)
+        if article is None:
+            logger.warning("ID inconnu renvoyé par le LLM : %s", s.id)
+            continue
+        out.append(
+            ScoredArticle(
+                article=article,
+                score=max(0, min(10, s.score)),
+                summary=s.summary,
+                reason=s.reason,
+            )
+        )
+    return out
+
+
+@_retry
+async def score_gemini(articles: list[Article], criteria: str) -> list[ScoredArticle]:
+    client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    response = await client.aio.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=_prompt(articles, criteria),
         config=types.GenerateContentConfig(
             response_mime_type="application/json",
             response_schema=BatchScoreResult,
             temperature=0.2,
         ),
     )
-
     result = BatchScoreResult.model_validate_json(response.text)
-    return result.results
+    return _join(articles, result.results)
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-async def score_articles_groq(articles: List[Article], criteria: str) -> List[ScoredArticle]:
-    """Fallback en utilisant l'API Groq."""
+@_retry
+async def score_groq(articles: list[Article], criteria: str) -> list[ScoredArticle]:
     from groq import AsyncGroq
 
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        logger.error("GROQ_API_KEY absente.")
-        return []
-
-    client = AsyncGroq(api_key=api_key)
-
-    articles_payload = [
-        {"id": a.id, "title": a.title, "summary": a.summary, "link": a.link}
-        for a in articles
-    ]
-
-    prompt = f"""Tu es un expert en veille d'actualité.
-Évalue la liste d'articles ci-dessous selon les critères suivants : "{criteria}".
-Réponds STRICTEMENT sous la forme d'un objet JSON au format :
-{{"results": [{{"id": "string", "score": int, "summary": "string", "reason": "string"}}]}}
-
-Articles à évaluer :
-{json.dumps(articles_payload, ensure_ascii=False, indent=2)}
-"""
-
+    client = AsyncGroq(api_key=os.environ["GROQ_API_KEY"])
     response = await client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[{"role": "user", "content": prompt}],
+        model=GROQ_MODEL,
+        messages=[{"role": "user", "content": _prompt(articles, criteria)}],
         response_format={"type": "json_object"},
         temperature=0.2,
     )
-
-    text = response.choices[0].message.content
-    result = BatchScoreResult.model_validate_json(text)
-    return result.results
+    result = BatchScoreResult.model_validate_json(response.choices[0].message.content)
+    return _join(articles, result.results)
 
 
-async def score_articles_batch(articles: List[Article], criteria: str) -> List[ScoredArticle]:
-    """Point d'entrée principal pour le scoring avec gestion de fallback."""
+async def score_articles_batch(
+    articles: list[Article], criteria: str
+) -> list[ScoredArticle] | None:
+    """Retourne None si TOUS les LLM ont échoué (pour ne pas marquer les articles comme vus)."""
     if not articles:
         return []
 
-    provider = get_llm_provider()
+    providers = {"gemini": score_gemini, "groq": score_groq}
+    keys = {"gemini": "GEMINI_API_KEY", "groq": "GROQ_API_KEY"}
+    
+    first = os.getenv("DEFAULT_LLM_PROVIDER", "gemini").lower()
+    order = [first] + [p for p in providers if p != first]
 
-    try:
-        if provider == "gemini":
-            return await score_articles_gemini(articles, criteria)
-        elif provider == "groq":
-            return await score_articles_groq(articles, criteria)
-        else:
-            logger.error(f"Fournisseur LLM inconnu : {provider}")
-            return []
-    except Exception as e:
-        logger.warning(f"Échec avec le LLM principal ({provider}): {e}. Tentative de fallback...")
+    for name in order:
+        if not os.getenv(keys[name]):
+            continue
         try:
-            if provider == "gemini" and os.getenv("GROQ_API_KEY"):
-                return await score_articles_groq(articles, criteria)
-            elif provider == "groq" and os.getenv("GEMINI_API_KEY"):
-                return await score_articles_gemini(articles, criteria)
-        except Exception as fallback_err:
-            logger.error(f"Échec du fallback LLM : {fallback_err}")
-        
-        return []
+            return await providers[name](articles, criteria)
+        except Exception as e:
+            logger.warning("Échec du LLM %s : %r", name, e)
+
+    return None
